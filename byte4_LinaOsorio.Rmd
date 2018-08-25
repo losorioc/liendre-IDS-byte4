@@ -3,8 +3,8 @@ title: "byte4"
 author: "Lina Osorio"
 date: "April 16, 2018"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -13,10 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-This document analyses the way in which people navigate across Wikipedia's principal articles; also, which are the articles with more requests, and which are the articles through which people get into the targeted article. To make the second point more clear I'll ilustrate different examples later.
-I selected Wikipedia articles that express opposed points of views. For example, capitalism and communism. The idea is constructing a network of articles that are requested before or after these targeted articles, and see if they have some topics in common in their network. What I want to see is if the users read about both topics and some how contrast ideas, or if they concentrate their research in one of the edges.
-The information used was the Wikipedia [Clickstream](https://figshare.com/articles/Wikipedia_Clickstream/1305770) dataset for February, 2015. This data set contains counts of (refer, source) pairs that Wikipedia researchers extract monthly. This data shows how people get a particular wikipedia article and what links they click on. The raw database has 22,130,165 observations and four variables:  
+This document explores the interaction of end users with the Wikipedia interface. Specifically, the most popular principal articles that people requests, also the articles that end users request before and after getting into a particular article. The information used was the Wikipedia Clickstream February 2015 dataset <https://figshare.com/articles/Wikipedia_Clickstream/1305770>. 
 
+The dataset has the following four variables: 
 **Source** is the result of mapping the refereed URL to a set of values that correspond to the internal traffic of Wikipedia.  
 **Target** is the unique MediaWiki page ID of every article that a client requested.  
 **Type** is a variable that can take three possible values. "link" which referes that both articles were refered within Wikipedia. "Redlink" which refers to a requests that does not link to a enwiki.page table. "Other" refers to an article that does not link to the request.  
@@ -26,7 +25,7 @@ The information used was the Wikipedia [Clickstream](https://figshare.com/articl
 
 # Cleaning and Exploring data
 
-First, I filtered the database by type equal to "link" because those observations represent pairs represent the internal Wikipedia traffic. After this cleaning, the database reduced to 13,314,703 observations. 
+I filtered the variable type equal to "link" gettin the source and target pairs that represent the internal Wikipedia traffic.
 
 ```{r libraries, include=FALSE}
 # install.packages("devtools")
@@ -35,8 +34,9 @@ local({r <- getOption("repos")
        options(repos=r)
 })
 
-install.packages(c("igraph", "ggraph"))
-devtools ::install_github("tidyverse/ggplot2")
+#install.packages(c("igraph", "ggraph"))
+#devtools ::install_github("tidyverse/ggplot2")
+#devtools::install_github("stan-dev/rstan", ref = "develop", subdir = "rstan/rstan")
 library(readr)
 library(data.table)
 library(plyr)
@@ -47,13 +47,14 @@ library(igraph)
 library(ggraph)
 library(ggplot2)
 library(pander)
+library(gridExtra)
 ```
 
 ```{r getting data, include=FALSE}
 
 ## titles
-
-fd <- "C:/Users/linos/Dropbox/CMUSpring2018/IDS/byte4/data"
+#X <- read.csv(url("https://s3-eu-west-1.amazonaws.com/pfigshare-u-files/5036383/2015_02_en_clickstream.tsv.gz"))
+fd <- "C:/Users/linos/Desktop/rbyte4"
 setwd(fd)
 
 only_link <- read.table("only_link.tsv")
@@ -77,7 +78,7 @@ sour_occ_agg <- aggregate(sour_occ$occurrences, by=list(source=sour_occ$source),
 sour_occ_agg_top10 <- sour_occ_agg[order(desc(sour_occ_agg$x)),]
 ```
 
-The next table shows the top 10 of articles type "link" that were more requested. 
+The next table shows the top 10 articles that were more requested during the selected time period. 
 ```{r table1, echo=FALSE}
 top10_occ <- head(tar_occ_agg_top10,10)
 
@@ -85,7 +86,7 @@ names(top10_occ) <- c("Target", "Occurrences")
 
 pander(top10_occ, type = 'grid')
 ```
-Contrary to the previous table, the next table shows the main sources. It called my attention for example that Meghan_Markle, Prince Harry's fiance is one of the main sources, and Price_Harry one of the main targets. It means that users that click in Meghan_Markle article do this as an intermediate step to reach out a target article, while the users that reach Prince_Harry tend to read about it and then leave Wikipedia. On the other hand, the two filsm Thor and Justice_League are both source and target making more interesting interactions.
+Contrary to the previous table, the next one shows the main sources. For example, one of the more frequently requested source article is Meghan_Markle, and Price_Harry one of the main targets. It means that most of users that look for Meghan_Markle's article request a target article after, while the users that reach Prince_Harry article do not request another one after reading it.
 
 ```{r table2, echo=FALSE}
 top10_sour <- head(sour_occ_agg_top10,10)
@@ -102,10 +103,9 @@ g <- graph_from_data_frame(only_link, directed = TRUE)
 
 ## Visualization
 
-The pairs that I'll explore are communism and capitalism, left and right wings politics, social democracy and military dictatorship, and nuclear power and liquefied petroleum gas.
+The next two network graphs show the interaction around two principal articles. Communism and Capitalism.
 
-1.  Capitalism and Communism
-
+### Capitalism and Communism
 ```{r capitalism, include=FALSE, warning=FALSE}
 ## working with graphs capitalism
 sg <- make_ego_graph(g, order = 1, mode = "out", V(g)["Capitalism"])[[1]]
@@ -132,6 +132,10 @@ scale_size_continuous(guide = FALSE) +
 
 theme_graph() +
 theme(legend.position = "bottom")
+
+ggsave(capitalism[4], plot = last_plot(), device = jpeg,
+  scale = 1, width = NA, height = NA,
+  dpi = 300, limitsize = TRUE)
 ```
 
 ```{r communism, include=FALSE, warning=FALSE}
@@ -162,173 +166,6 @@ theme_graph() +
 theme(legend.position = "bottom")
 ```
 
-2.  Left- and right-wing politics
-
-```{r left wing, include=FALSE, warning=FALSE}
-sg2 <- make_ego_graph(g, order = 1, mode = "out", V(g)["Left-wing_politics"])[[1]]
-# Number of neighbors:
-V(sg2)$edges <- degree(sg2)
-
-# Labels where the spaces aren't underscores:
-V(sg2)$label <- gsub("_", " ", V(sg2)$name, fixed = TRUE)
-
-ssg2 <- induced_subgraph(sg2, V(sg2)[edges > 45])
-
-```
-
-```{r echo=FALSE, warning=FALSE}
-## visualization
-set.seed(1000) # for reproducibility
-ggraph(ssg2, layout = "dh") +
-geom_edge_diagonal(aes(alpha = log10(occurrences))) +
-scale_edge_alpha_continuous("Clicks", labels = function(x) { return(ceiling(10 ^ x)) }) +
-geom_node_label(aes(label = label, size = edges)) +
-scale_size_continuous(guide = FALSE) +
-
-theme_graph() +
-theme(legend.position = "bottom")
-
-```
-
-```{r right wing, include=FALSE, warning=FALSE}
-sg3 <- make_ego_graph(g, order = 1, mode = "out", V(g)["Right-wing_politics"])[[1]]
-# Number of neighbors:
-V(sg3)$edges <- degree(sg3)
-
-# Labels where the spaces aren't underscores:
-V(sg3)$label <- gsub("_", " ", V(sg3)$name, fixed = TRUE)
-
-ssg3 <- induced_subgraph(sg3, V(sg3)[edges > 35])
-```
-
-```{r echo=FALSE, , echo=FALSE, warning=FALSE}
-## visualization
-
-set.seed(1000) # for reproducibility
-ggraph(ssg3, layout = "dh") +
-geom_edge_diagonal(aes(alpha = log10(occurrences))) +
-scale_edge_alpha_continuous("Clicks", labels = function(x) { return(ceiling(10 ^ x)) }) +
-geom_node_label(aes(label = label, size = edges)) +
-scale_size_continuous(guide = FALSE) +
-
-theme_graph() +
-theme(legend.position = "bottom")
-
-```
-
-3.  Democracy and dictatorship
-
-```{r social democracy, include=FALSE, warning=FALSE}
-sg4 <- make_ego_graph(g, order = 1, mode = "out", V(g)["Democracy"])[[1]]
-# Number of neighbors:
-V(sg4)$edges <- degree(sg4)
-
-# Labels where the spaces aren't underscores:
-V(sg4)$label <- gsub("_", " ", V(sg4)$name, fixed = TRUE)
-
-ssg4 <- induced_subgraph(sg4, V(sg4)[edges > 60])
-```
-
-```{r echo=FALSE, , echo=FALSE, warning=FALSE}
-## visualization
-
-set.seed(10) # for reproducibility
-ggraph(ssg4, layout = "dh") +
-geom_edge_diagonal(aes(alpha = log10(occurrences))) +
-scale_edge_alpha_continuous("Clicks", labels = function(x) { return(ceiling(10 ^ x)) }) +
-geom_node_label(aes(label = label, size = edges)) +
-scale_size_continuous(guide = FALSE) +
-
-theme_graph() +
-theme(legend.position = "bottom")
-
-```
-
-```{r Dictatorship, include=FALSE, warning=FALSE}
-sg5 <- make_ego_graph(g, order = 1, mode = "out", V(g)["Military_dictatorship"])[[1]]
-# Number of neighbors:
-V(sg5)$edges <- degree(sg5)
-
-# Labels where the spaces aren't underscores:
-V(sg5)$label <- gsub("_", " ", V(sg5)$name, fixed = TRUE)
-
-ssg5 <- induced_subgraph(sg5, V(sg5)[edges > 48])
-```
-
-```{r echo=FALSE, , echo=FALSE, warning=FALSE}
-## visualization
-
-set.seed(1000) # for reproducibility
-ggraph(ssg5, layout = "dh") +
-geom_edge_diagonal(aes(alpha = log10(occurrences))) +
-scale_edge_alpha_continuous("Clicks", labels = function(x) { return(ceiling(10 ^ x)) }) +
-geom_node_label(aes(label = label, size = edges)) +
-
-scale_size_continuous(guide = FALSE) +
-theme_graph() +
-theme(legend.position = "bottom")
-
-```
-
-4.  Nuclear power and Petroleum
-
-```{r Nuclear, include=FALSE, warning=FALSE}
-sg6 <- make_ego_graph(g, order = 1, mode = "out", V(g)["Nuclear_power_plant"])[[1]]
-# Number of neighbors:
-V(sg6)$edges <- degree(sg6)
-
-# Labels where the spaces aren't underscores:
-V(sg6)$label <- gsub("_", " ", V(sg6)$name, fixed = TRUE)
-
-ssg6 <- induced_subgraph(sg6, V(sg6)[edges > 15])
-```
-
-```{r echo=FALSE, , echo=FALSE, warning=FALSE}
-## visualization
-
-set.seed(1000) # for reproducibility
-ggraph(ssg6, layout = "dh") +
-geom_edge_diagonal(aes(alpha = log10(occurrences))) +
-scale_edge_alpha_continuous("Clicks", labels = function(x) { return(ceiling(15 ^ x)) }) +
-geom_node_label(aes(label = label, size = edges)) +
-
-scale_size_continuous(guide = FALSE) +
-theme_graph() +
-theme(legend.position = "bottom")
-
-```
-
-```{r Petroleum, include=FALSE, warning=FALSE}
-sg7 <- make_ego_graph(g, order = 1, mode = "out", V(g)["Liquefied_petroleum_gas"])[[1]]
-# Number of neighbors:
-V(sg7)$edges <- degree(sg7)
-
-# Labels where the spaces aren't underscores:
-V(sg7)$label <- gsub("_", " ", V(sg7)$name, fixed = TRUE)
-
-ssg7 <- induced_subgraph(sg7, V(sg7)[edges > 15])
-```
-
-```{r echo=FALSE, , echo=FALSE, warning=FALSE}
-## visualization
-
-set.seed(1000) # for reproducibility
-ggraph(ssg7, layout = "dh") +
-geom_edge_diagonal(aes(alpha = log10(occurrences))) +
-scale_edge_alpha_continuous("Clicks", labels = function(x) { return(ceiling(15 ^ x)) }) +
-geom_node_label(aes(label = label, size = edges)) +
-
-scale_size_continuous(guide = FALSE) +
-theme_graph() +
-theme(legend.position = "bottom")
-
-```
-
-
-## Conclusions
-
-The networks show that there are interactions between communism and capitalism, left- and right-wing politics, and democracy and dictatorship. It means that some of the users that look for information about one of the topics also search for information about the other. For example, communism and capitalism networks include marxism, socialism, and economic system. On the other hand, there are topics such as nuclear energy and petroleum that do not share common nodes. Both nuclear power and and petroleum are essential sources of energy. In fact, some experts consider that atomic power might be the solution to climate change [(see the documentary Pandora's Promise)](https://www.youtube.com/watch?v=kBMj-96hols&list=PLHBuAIh8m2Sspvr_a-UXGa1qY1hTVU7SE). However, the data show that users that read about nuclear focus their searches on nuclear desasters and do not read about any other source of energy.  
-
-This analysis does not allow reliable conclusions about users reasoning and motivations to look for those topics. Further developments are needed to get stronger evidence about causality. For example, looking for a broader group of paired themes; making a network analysis to calculate the distance between nodes; trying to have any information about users motivations when reading about different issues in the same search. This further analysis could provide evidence about users' capacity to contrast and challenge opposed points of view. 
+These two networks show that people that requested the article Communism frequently go through the article Capitalism.  It might mean that  some of the users that look for information to contrast opossite topics. This analysis does not allow reliable conclusions about users reasoning and motivations to look for those topics. Further study is needed to get stronger evidence. For example, looking for a broader group of paired themes; making a network analysis to calculate closeness between nodes.
 
 Finally, I used the code used for the net_neutrality analysis to build the network graphs in R. <https://blog.wikimedia.org/2018/01/18/on-that-net-neutrality-clickstream-diagram/>
