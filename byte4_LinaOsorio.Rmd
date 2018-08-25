@@ -53,9 +53,9 @@ library(gridExtra)
 ```{r getting data, include=FALSE}
 
 ## titles
-#X <- read.csv(url("https://s3-eu-west-1.amazonaws.com/pfigshare-u-files/5036383/2015_02_en_clickstream.tsv.gz"))
-fd <- "C:/Users/linos/Desktop/rbyte4"
-setwd(fd)
+X <- read.csv(url("https://s3-eu-west-1.amazonaws.com/pfigshare-u-files/5036383/2015_02_en_clickstream.tsv.gz"))
+#fd <- "C:/Users/linos/Desktop/rbyte4"
+#setwd(fd)
 
 only_link <- read.table("only_link.tsv")
 ```
